@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>VHF Data Profile Flow</title>
+<style>
+:root{--bg:#fbfaf7;--panel:#ffffff;--ink:#1d1d1b;--sub:#5a5954;--muted:#8a8882;--rule:#e3e1da;--halo:#fbfaf7;--g:#888780;--role:#7F77DD;--don:#1D9E75;--full:#639922;--mail:#378ADD;--email:#BA7517;--name:#E24B4A}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1a19;--panel:#222220;--ink:#f0efec;--sub:#c3c2b7;--muted:#8f8d86;--rule:#33332f;--halo:#1a1a19}}
+:root[data-theme="dark"]{--bg:#1a1a19;--panel:#222220;--ink:#f0efec;--sub:#c3c2b7;--muted:#8f8d86;--rule:#33332f;--halo:#1a1a19}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1060px;margin:0 auto;padding:28px 16px 40px}
+h1{font-size:24px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--sub);margin:0 0 18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 18px}
+.tile{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:12px 14px}
+.tile b{display:block;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.tile span{font-size:13px;color:var(--sub)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--sub);margin:0 0 8px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.chart{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px;overflow-x:auto}
+svg{display:block;width:100%;min-width:760px;height:auto}
+#tip{font-size:14px;color:var(--sub);min-height:22px;margin:8px 2px 0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;background:var(--panel);border:1px solid var(--rule)}
+caption{text-align:left;font-weight:600;font-size:14px;padding:0 0 6px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--rule);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--sub);font-weight:600}
+tr.tot td{font-weight:600}
+footer{color:var(--muted);font-size:12px;margin-top:20px}
+@page{size:letter landscape;margin:0.35in}
+@media print{main{padding:0;max-width:none}.chart,table{break-inside:avoid}.chart{overflow:visible;padding:6px}svg{min-width:0;width:auto;height:5.3in;margin:0 auto}h1{font-size:20px}.sub{margin-bottom:8px}.tiles{margin-bottom:8px}.tile{padding:6px 10px}.tile b{font-size:19px}#tip{display:none}.cols{break-before:page}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<main>
+<h1>VHF data profile flow</h1>
+<p class="sub" id="lede"></p>
+<div class="tiles" id="tiles"></div>
+<div class="legend">
+<span><i style="background:var(--don)"></i>Donors by lifetime giving</span>
+<span><i style="background:var(--role)"></i>Non-donors by role</span>
+<span><i style="background:var(--full)"></i>Full</span>
+<span><i style="background:var(--mail)"></i>Mail only</span>
+<span><i style="background:var(--email)"></i>Email only</span>
+<span><i style="background:var(--name)"></i>Name only</span>
+</div>
+<div class="chart">
+<svg id="sk" viewBox="0 0 980 800" role="img" aria-labelledby="skt skd"><title id="skt">VHF import records flow</title><desc id="skd"></desc></svg>
+<div id="tip">Hover any ribbon or bar for its count.</div>
+</div>
+<div class="cols" id="tables"></div>
+<footer id="foot"></footer>
+</main>
+<script>
+const DATA = {"version": "v8", "date": "Nov 18, 2026", "donor_n": 1124, "donor_dollars": 2740631, "dollars_by_profile": [49030, 2359245, 26864, 305492], "placeholders": 11, "placeholder_dollars": 101349, "donors": [["$10K+", 34, [0, 30, 1, 3]], ["$1K–10K", 164, [15, 79, 6, 64]], ["Under $1K", 926, [160, 207, 106, 453]]], "roles": [["Veteran", 219, [168, 6, 44, 1]], ["5K runner only", 178, [165, 13, 0, 0]], ["Veteran family", 107, [65, 1, 39, 2]], ["Regpack, no role", 90, [20, 0, 69, 1]], ["Luncheon guest only", 73, [40, 0, 24, 9]], ["Volunteer / caregiver", 34, [21, 0, 13, 0]], ["Workshop only", 26, [12, 0, 14, 0]], ["Newsletter only", 3, [1, 0, 2, 0]]], "note": "Not shown: about 5,900 newsletter subscribers not yet imported, waiting on the pricing decision."};
+const fmt=v=>v.toLocaleString('en-US'),pct=(a,b)=>Math.round(a/b*100)+'%';
+const money=v=>v>=1e6?'$'+(v/1e6).toFixed(2)+'M':'$'+Math.round(v/1e3)+'K';
+const P=['Full','Mail only','Email only','Name only'],PC={Full:'full','Mail only':'mail','Email only':'email','Name only':'name'};
+const D=DATA.donors,R=DATA.roles,ND=DATA.donor_n,NN=R.reduce((s,r)=>s+r[1],0),PL=DATA.placeholders,ALL=ND+NN+PL;
+const tot=P.map((p,i)=>[...D,...R].reduce((s,r)=>s+r[2][i],0));
+const dReach=D.reduce((s,r)=>s+r[1]-r[2][3],0),nReach=R.reduce((s,r)=>s+r[1]-r[2][3],0);
+document.getElementById('lede').textContent=`Every record in the Bloomerang import (${DATA.version}, ${DATA.date}): who they are, and how complete their profile is. Full means a mailing address and an email.`;
+document.getElementById('tiles').innerHTML=[[fmt(ALL),'records in the import'],[pct(dReach+nReach,ALL),`reachable by mail or email (${fmt(dReach+nReach)})`],[pct(tot[0],ALL),`full profile (${fmt(tot[0])})`],[pct(dReach,ND),`of donors reachable (${fmt(dReach)} of ${fmt(ND)})`],[pct(nReach,NN),`of non-donors reachable (${fmt(nReach)} of ${fmt(NN)})`]].map(t=>`<div class="tile"><b>${t[0]}</b><span>${t[1]}</span></div>`).join('');
+document.getElementById('skd').textContent=`${fmt(ALL)} records split into ${fmt(ND)} donors, ${fmt(NN)} non-donors and ${PL} placeholder accounts, then into four profile groups: `+P.map((p,i)=>`${p.toLowerCase()} ${fmt(tot[i])}`).join(', ')+'.';
+const tbl=(cap,head,rows,extra)=>`<table><caption>${cap}</caption><tr><th>${head}</th><th>Full</th><th>Mail</th><th>Email</th><th>Name</th><th>Total</th></tr>`+rows.map(r=>`<tr><td>${r[0]}</td>${r[2].map(fmt).map(v=>`<td>${v}</td>`).join('')}<td>${fmt(r[1])}</td></tr>`).join('')+extra+'</table>';
+const sumRow=(lab,rows)=>`<tr class="tot"><td>${lab}</td>${P.map((p,i)=>`<td>${fmt(rows.reduce((s,r)=>s+r[2][i],0))}</td>`).join('')}<td>${fmt(rows.reduce((s,r)=>s+r[1],0))}</td></tr>`;
+document.getElementById('tables').innerHTML=tbl(`Donors (${fmt(ND)} · ${money(DATA.donor_dollars)})`,'Lifetime giving',D,sumRow('All donors',D)+`<tr><td>Dollars</td>${DATA.dollars_by_profile.map(v=>`<td>${money(v)}</td>`).join('')}<td>${money(DATA.donor_dollars)}</td></tr>`)+tbl(`Non-donors (${fmt(NN)})`,'Role',R,sumRow('All non-donors',R));
+document.getElementById('foot').textContent=`Counts from the ${DATA.version} import file, ${DATA.date}. Donors have at least one real gift (event tickets are not gifts). The ${PL} placeholder accounts (Anonymous, donor-advised fund platforms; ${money(DATA.placeholder_dollars)}) can never have a real contact. ${DATA.note} No individual names appear on this page.`;
+const css=getComputedStyle(document.documentElement),V=n=>css.getPropertyValue('--'+n).trim();
+const k=Math.min(0.33,700/ALL),W=13,G=10,T=10,X=[0,210,470,760];
+const ns='http://www.w3.org/2000/svg',svg=document.getElementById('sk'),tip=document.getElementById('tip');
+const el=(t,a)=>{const e=document.createElementNS(ns,t);for(const q in a)e.setAttribute(q,a[q]);svg.appendChild(e);return e;};
+const H=v=>Math.max(2,v*k);
+const node=(l,v,col,y,c,info)=>({l,v,x:X[col],y,h:H(v),c,info,so:0,to:0});
+const all=node('All records',ALL,0,T,V('g'),`All records in the import: ${fmt(ALL)}`);
+let y=T;const don=node('Donors',ND,1,y,V('don'),`Proven donors: ${fmt(ND)}, ${money(DATA.donor_dollars)} lifetime`);y+=don.h+G+14;
+const non=node('Non-donors',NN,1,y,V('role'),`Non-donors: ${fmt(NN)} (registrants, veterans, families, guests, volunteers)`);y+=non.h+G+14;
+const pool=node('Placeholders',PL,1,y,V('g'),`Placeholder accounts: ${PL}, ${money(DATA.placeholder_dollars)}. Never reachable.`);
+y=T;const dn=D.map(d=>{const n=node(d[0],d[1],2,y,V('don'),'');n.sp=d[2];y+=n.h+G;return n;});y+=22;
+const rn=R.map(r=>{const n=node(r[0],r[1],2,y,V('role'),'');n.sp=r[2];y+=n.h+G;return n;});
+y=T+30;const pn=P.map((p,i)=>{const n=node(p,tot[i],3,y,V(PC[p]),`${p}: ${fmt(tot[i])} records (${pct(tot[i],ALL)} of all)`);y+=n.h+G+26;return n;});
+function link(s,t,v,c,msg){const w=Math.max(1.2,v*k),sy=s.y+s.so+w/2,ty=t.y+t.to+w/2;s.so+=w;t.to+=w;const x1=s.x+W,x2=t.x,m=(x1+x2)/2;
+const p=el('path',{d:`M${x1} ${sy}C${m} ${sy},${m} ${ty},${x2} ${ty}`,fill:'none',stroke:c,'stroke-width':w,'stroke-opacity':0.3});
+p.addEventListener('mouseenter',()=>{p.setAttribute('stroke-opacity',0.6);tip.textContent=msg;});p.addEventListener('mouseleave',()=>p.setAttribute('stroke-opacity',0.3));}
+link(all,don,ND,V('don'),`All records → donors: ${fmt(ND)}`);link(all,non,NN,V('role'),`All records → non-donors: ${fmt(NN)}`);link(all,pool,PL,V('g'),`All records → placeholders: ${PL}`);
+dn.forEach(n=>link(don,n,n.v,V('don'),`Donors → ${n.l} lifetime: ${fmt(n.v)}`));
+rn.forEach(n=>link(non,n,n.v,V('role'),`Non-donors → ${n.l}: ${fmt(n.v)}`));
+[...dn,...rn].forEach((n,j)=>n.sp.forEach((v,i)=>{if(v)link(n,pn[i],v,V(PC[P[i]]),`${j<D.length?'Donors '+n.l:n.l} → ${P[i]}: ${fmt(v)}`);}));
+const halo='paint-order:stroke;stroke:var(--halo);stroke-width:3.5px;stroke-linejoin:round;';
+function txt(x,y,s,size,w,fill){const t=el('text',{x,y,'dominant-baseline':'central',style:`${halo}font-size:${size}px;font-weight:${w};fill:var(--${fill})`});t.textContent=s;}
+function bar(n){const r=el('rect',{x:n.x,y:n.y,width:W,height:n.h,rx:2,fill:n.c});r.addEventListener('mouseenter',()=>tip.textContent=n.info);}
+[all,don,non,pool,...dn,...rn,...pn].forEach(n=>{if(!n.info){const reach=n.v-n.sp[3];n.info=`${n.l}: ${fmt(n.v)} · ${fmt(reach)} reachable (${pct(reach,n.v)})`;}bar(n);});
+const two=(n,a,b,big)=>{const c=n.y+n.h/2;txt(n.x+W+7,c-9,a,big?15:14,600,'ink');txt(n.x+W+7,c+9,b,12,400,'sub');};
+two(all,'All records',fmt(ALL),1);two(don,'Donors',`${fmt(ND)} · ${money(DATA.donor_dollars)}`,1);two(non,'Non-donors',fmt(NN),1);
+txt(pool.x+W+7,pool.y+pool.h/2,`Placeholders · ${PL}`,12,400,'sub');
+[...dn,...rn].forEach(n=>txt(n.x+W+7,n.y+n.h/2,`${n.l} · ${fmt(n.v)}`,12,n.l==='$1K–10K'?600:400,'ink'));
+pn.forEach(n=>two(n,n.l,`${fmt(n.v)} · ${pct(n.v,ALL)}`));
+const mx=Math.max(...[all,don,non,pool,...dn,...rn,...pn].map(n=>n.y+n.h));svg.setAttribute('viewBox',`0 0 980 ${Math.ceil(mx+14)}`);
+</script>
+</body>
+</html>
